@@ -4,18 +4,26 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	arg "github.com/alexflint/go-arg"
 	"github.com/davecgh/go-spew/spew"
 	//	"github.com/rivo/tview"
-	bitfield "github.com/hymkor/go-bitfield"
 )
 
 var args struct {
 	Filename string `arg:"required"`
 }
+
+var regexRecycled = regexp.MustCompile(`^#\d+\srecycled$`)
+var regexStartsObjDef = regexp.MustCompile(`^#\d+$`)
+var regexStartsVerbBlock = regexp.MustCompile(`^#\d+:\d+$`)
+
+var currObjLines []string
 
 type DbHeader struct {
 	VersionString    string
@@ -44,6 +52,162 @@ type VerbDefinition struct {
 	Owner       int
 	Permissions PermissionSpec
 	Preposition int
+}
+
+type Object struct {
+	Number      int
+	Recycled    bool
+	Name        string
+	handles     string
+	Flags       string
+	Owner       int
+	Location    int
+	ContentList []string
+	Parent      int
+	ChildList   []string
+}
+
+func ObjectFromRecycledLine(line string) Object {
+	split := strings.Split(line, " ")
+	numString := strings.TrimLeft(split[0], "#")
+	spew.Dump(line)
+	num, err := strconv.Atoi(numString)
+	if err != nil {
+		fmt.Errorf("Error parsing recycled line %s : %v", line, err)
+	}
+
+	return Object{
+		Number:   num,
+		Recycled: true,
+	}
+}
+
+func lineIsRecycledObject(line string) bool {
+	if regexRecycled.MatchString(line) {
+		return true
+	}
+
+	return false
+}
+
+func lineStartsObjectDefinition(line string) bool {
+	if regexStartsObjDef.MatchString(line) {
+		return true
+	}
+
+	return false
+}
+
+func lineStartsVerbBlock(line string) bool {
+	if regexStartsVerbBlock.MatchString(line) {
+		return true
+	}
+
+	return false
+}
+
+func currentObjectContentsListEndingIndex() int {
+	for i, str := range currObjLines[6:] {
+		if str == "-1" {
+			return i
+		}
+	}
+
+	return -999
+}
+
+func currentObjectChildListEndingIndex(start int) int {
+	for i, str := range currObjLines[start:] {
+		if str == "-1" {
+			return i
+		}
+	}
+
+	return -999
+}
+
+func processCurrentObject() (Object, error) {
+	// Simple enough to parse these
+	fmt.Printf("Object lines: %v\n", len(currObjLines))
+
+	num, err := strconv.Atoi(strings.Trim(currObjLines[0], "#"))
+	name := currObjLines[1]
+	handles := currObjLines[2]
+	flags := currObjLines[3]
+	owner, err := strconv.Atoi(currObjLines[4])
+	location, err := strconv.Atoi(currObjLines[5])
+
+	if err != nil {
+		return Object{}, fmt.Errorf("Error parsing current object: %v", err)
+	}
+	fmt.Println("Ay! Made it!")
+	contentListEndIndex := currentObjectContentsListEndingIndex()
+	runtime.Breakpoint()
+	parentIndex := contentListEndIndex + 1
+	childListStartIndex := parentIndex + 1
+	childListEndIndex := currentObjectChildListEndingIndex(childListStartIndex)
+
+	contentList := currObjLines[6:contentListEndIndex]
+	parent, err := strconv.Atoi(currObjLines[contentListEndIndex])
+	childList := currObjLines[childListStartIndex:childListEndIndex]
+
+	finalObj := Object{
+		Number:      num,
+		Name:        name,
+		handles:     handles,
+		Flags:       flags,
+		Owner:       owner,
+		Location:    location,
+		ContentList: contentList,
+		Parent:      parent,
+		ChildList:   childList,
+	}
+
+	return finalObj, nil
+	// TODO Grab verb definitions for object
+	// TODO Grab Property names
+	// TODO Gtab Property definitions
+
+	// TODO Parse Verb Block
+}
+
+func parseObjectBlock(dbLines []string, startingIndex int) ([]Object, error) {
+	var objects []Object
+
+	for i, value := range dbLines[startingIndex:] {
+		fmt.Printf("Iterating over Line %d: %s\n", i, value)
+
+		if lineIsRecycledObject(value) {
+			fmt.Printf("  It is a recycled object\n")
+			objects = append(objects, ObjectFromRecycledLine(value))
+		} else if lineStartsVerbBlock(value) {
+			fmt.Printf("  It begins the verb block\n")
+			return objects, nil
+		} else if lineStartsObjectDefinition(value) {
+			fmt.Printf("  It starts the object definition\n")
+			fmt.Printf("Tis is it: %v", value)
+			time.Sleep(1 * time.Second)
+			// TODO Think this is fucked - only getting one line before it runs
+			if len(currObjLines) > 0 {
+				fmt.Printf("  An object is waiting to be processed...\n")
+				time.Sleep(1 * time.Second)
+				obj, err := processCurrentObject()
+				if err != nil {
+					return objects, fmt.Errorf("Error processing object: %v", err)
+				}
+				objects = append(objects, obj)
+				currObjLines = []string{}
+			}
+
+			currObjLines = append(currObjLines, value)
+		} else {
+			// Add to current object?
+			currObjLines = append(currObjLines, value)
+		}
+
+	}
+
+	return objects, nil
 }
 
 func parseHeader(dbLines []string) *DbHeader {
@@ -105,19 +269,18 @@ func main() {
 	}
 
 	lines := strings.Split(string(b), "\n")
-	header := parseHeader(lines)
+	//header := parseHeader(lines)
 
 	objStart, err := GetObjectBlockStartLine(lines)
 	if err != nil {
 		fmt.Errorf("Error getting start of object block: %v", err)
 	}
-
-	spew.Dump(header)
-	spew.Dump(objStart)
-
-	var perms PermissionSpec
-	bitfield.Unpack(69, &perms)
-	spew.Dump(perms)
+	fmt.Printf("Start of object block: line %d", objStart)
+	time.Sleep(1 * time.Second)
+	objects, err := parseObjectBlock(lines, objStart)
+	spew.Dump(objects)
+	z := lineIsRecycledObject("#4 recycled")
+	spew.Dump(z)
 	// box := tview.NewBox().SetBorder(true).SetTitle("Hello, world!")
 	// if err := tview.NewApplication().SetRoot(box, true).Run(); err != nil {
 	// 	panic(err)
