@@ -296,6 +296,29 @@ func GetVerbBlockSartLine(dbLines []string, objStartIdx int) (int, error) {
 	return -1, fmt.Errorf("Error finding verb block start line: reached end of DB")
 }
 
+func getObjDefinitionBounds(dbLines []string, objStartIdx int, objEndIdx int) ([][2]int, error) {
+	var result [][2]int
+
+	for i := objStartIdx; i <= objEndIdx; i++ {
+		// Have we finished parsing recycled objects?
+		// No - Is it a recycled object?
+		//// Yes - add [i, i] to result
+		//// No - mark recycled objects as done, skip this for further iterations
+		// Yes - very well
+		//
+		// Does current line indicate object start line?
+		// Yes
+		//// Do we have current object start index set?
+		//// Yes
+		////// Add bounds of current object to result and set current object
+		////// start index to i
+		//// No
+		////// Set current object start index to i
+	}
+
+	return result, nil
+}
+
 func main() {
 	// Handle args
 	arg.MustParse(&args)
@@ -327,6 +350,7 @@ func main() {
 	// suspended tasks, active connections w/ listeners and get relevant bounds
 
 	fmt.Printf("Start of object block: line %d", objStartIdx)
+	oDefBounds, err := getObjDefinitionBounds(lines, objStartIdx, objEndIdx)
 	objects, err := parseObjectBlock(lines, objStart)
 	spew.Dump(objects)
 	z := lineIsRecycledObject("#4 recycled")
