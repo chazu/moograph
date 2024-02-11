@@ -19,6 +19,7 @@ var args struct {
 	Filename string `arg:"required"`
 }
 
+// Regexes used in predicate functions below
 var regexRecycled = regexp.MustCompile(`^#\d+\srecycled$`)
 var regexStartsObjDef = regexp.MustCompile(`^#\d+$`)
 var regexStartsVerbBlock = regexp.MustCompile(`^#\d+:\d+$`)
@@ -32,6 +33,9 @@ type DbHeader struct {
 	TotalPlayerCount int
 }
 
+// PermissionSpec holds the decoded bitfield for object permissions.
+// Note that bitfield annotations describe the number of bits per member,
+// not the index of the bit in the field.
 // TODO Since whoever implemented the non-standard Overridable
 // Extension decided to break the bitfield by using 1024 instead
 // of 128^2, we'll have to manually detect that part.
@@ -47,6 +51,7 @@ type PermissionSpec struct {
 	Overridable uint
 }
 
+// Fairly straightforward - contains a verb definition.
 type VerbDefinition struct {
 	VerbName    string
 	Owner       int
@@ -54,6 +59,7 @@ type VerbDefinition struct {
 	Preposition int
 }
 
+// You know, for objects.
 type Object struct {
 	Number      int
 	Recycled    bool
@@ -67,11 +73,14 @@ type Object struct {
 	ChildList   []string
 }
 
+// Takes a string representing a recycled object and parses it into an Object
+// instance. Fairly naive, but recycled object lines shouldn't require more than
+// this.
 func ObjectFromRecycledLine(line string) Object {
 	split := strings.Split(line, " ")
 	numString := strings.TrimLeft(split[0], "#")
-	spew.Dump(line)
 	num, err := strconv.Atoi(numString)
+
 	if err != nil {
 		fmt.Errorf("Error parsing recycled line %s : %v", line, err)
 	}
@@ -82,6 +91,7 @@ func ObjectFromRecycledLine(line string) Object {
 	}
 }
 
+// Predicate functions using regex - fairly self-explanatory
 func lineIsRecycledObject(line string) bool {
 	if regexRecycled.MatchString(line) {
 		return true
@@ -106,16 +116,23 @@ func lineStartsVerbBlock(line string) bool {
 	return false
 }
 
+// End of predicate functions!
+
+// DEPRECATED - Function using global state to parse object block
+// Returns the index of the last line of the contents
+// TODO Refactor to avoid global state
 func currentObjectContentsListEndingIndex() int {
 	for i, str := range currObjLines[6:] {
 		if str == "-1" {
 			return i
 		}
 	}
-
 	return -999
 }
 
+// DEPRECATED - Function using global state to parse object block.
+// Returns the index of the end of the child list.
+// TODO Refactor to avoid global state
 func currentObjectChildListEndingIndex(start int) int {
 	for i, str := range currObjLines[start:] {
 		if str == "-1" {
@@ -127,6 +144,8 @@ func currentObjectChildListEndingIndex(start int) int {
 	return -999
 }
 
+// DEPRECATED - Function using global state to parse object block
+// TODO Refactor this one to accept object start and end index, for thread safety
 func processCurrentObject() (Object, error) {
 	// Simple enough to parse these
 	fmt.Printf("Object lines: %v\n", len(currObjLines))
