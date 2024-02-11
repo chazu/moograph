@@ -11,7 +11,6 @@ import (
 	"time"
 
 	arg "github.com/alexflint/go-arg"
-	"github.com/davecgh/go-spew/spew"
 	//	"github.com/rivo/tview"
 )
 
@@ -275,7 +274,7 @@ func parseHeader(dbLines []string) *DbHeader {
 // Return the index of the first line of the object block
 // TODO Check the number of players against the line found here
 // to ensure integrity
-func GetObjectBlockStartLine(dbLines []string) (int, error) {
+func GetObjectBlockStartLineIndex(dbLines []string) (int, error) {
 	for i := 4; i < len(dbLines); i++ {
 		if strings.HasPrefix("#", dbLines[i]) {
 			return i, nil
@@ -287,7 +286,7 @@ func GetObjectBlockStartLine(dbLines []string) (int, error) {
 }
 
 // Get the index of the line which starts the verb block
-func GetVerbBlockSartLine(dbLines []string, objStartIdx int) (int, error) {
+func GetVerbBlockStartLineIndex(dbLines []string, objStartIdx int) (int, error) {
 	for i := objStartIdx; i < len(dbLines); i++ {
 		if lineStartsVerbBlock(dbLines[i]) {
 			return i, nil
@@ -306,7 +305,7 @@ func getObjDefinitionBounds(dbLines []string, objStartIdx int, objEndIdx int) ([
 		// Handle recycled objects
 		if doneParsingRecycled == false {
 			if lineIsRecycledObject(dbLines[i]) {
-				result := append(result, [i, i])
+				result = append(result, [2]int{i, i})
 			} else {
 				doneParsingRecycled = true
 			}
@@ -316,7 +315,7 @@ func getObjDefinitionBounds(dbLines []string, objStartIdx int, objEndIdx int) ([
 			if currentObjStartIdx > 0 {
 				// Already inside an object, note the bounds before
 				// saving state of new object
-				result = append(result, [currentObjStartIdx, i - 1])
+				result = append(result, [2]int{currentObjStartIdx, i - 1})
 			}
 			currentObjStartIdx = i
 		}
@@ -338,7 +337,7 @@ func main() {
 	lines := strings.Split(string(b), "\n")
 
 	// Get header
-	header := parseHeader(lines)
+	// header := parseHeader(lines)
 
 	objStartIdx, err := GetObjectBlockStartLineIndex(lines)
 	if err != nil {
@@ -357,8 +356,9 @@ func main() {
 
 	fmt.Printf("Start of object block: line %d", objStartIdx)
 	oDefBounds, err := getObjDefinitionBounds(lines, objStartIdx, objEndIdx)
-	objects, err := parseObjectBlock(lines, objStart)
-	spew.Dump(objects)
-	z := lineIsRecycledObject("#4 recycled")
-	spew.Dump(z)
+	fmt.Println(oDefBounds)
+	// objects, err := parseObjectBlock(lines, objStart)
+	// spew.Dump(objects)
+	// z := lineIsRecycledObject("#4 recycled")
+	// spew.Dump(z)
 }
