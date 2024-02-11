@@ -297,23 +297,29 @@ func GetVerbBlockSartLine(dbLines []string, objStartIdx int) (int, error) {
 }
 
 func getObjDefinitionBounds(dbLines []string, objStartIdx int, objEndIdx int) ([][2]int, error) {
+	doneParsingRecycled := false
+	currentObjStartIdx := -1
 	var result [][2]int
 
 	for i := objStartIdx; i <= objEndIdx; i++ {
-		// Have we finished parsing recycled objects?
-		// No - Is it a recycled object?
-		//// Yes - add [i, i] to result
-		//// No - mark recycled objects as done, skip this for further iterations
-		// Yes - very well
-		//
-		// Does current line indicate object start line?
-		// Yes
-		//// Do we have current object start index set?
-		//// Yes
-		////// Add bounds of current object to result and set current object
-		////// start index to i
-		//// No
-		////// Set current object start index to i
+
+		// Handle recycled objects
+		if doneParsingRecycled == false {
+			if lineIsRecycledObject(dbLines[i]) {
+				result := append(result, [i, i])
+			} else {
+				doneParsingRecycled = true
+			}
+		}
+
+		if lineStartsObjectDefinition(dbLines[i]) {
+			if currentObjStartIdx > 0 {
+				// Already inside an object, note the bounds before
+				// saving state of new object
+				result = append(result, [currentObjStartIdx, i - 1])
+			}
+			currentObjStartIdx = i
+		}
 	}
 
 	return result, nil
