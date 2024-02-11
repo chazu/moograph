@@ -123,6 +123,7 @@ func currentObjectChildListEndingIndex(start int) int {
 		}
 	}
 
+	// u wot m8?
 	return -999
 }
 
@@ -259,6 +260,16 @@ func GetObjectBlockStartLine(dbLines []string) (int, error) {
 
 }
 
+// Get the index of the line which starts the verb block
+func GetVerbBlockSartLine(dbLines []string, objStartIdx int) (int, error) {
+	for i := objStartIdx; i < len(dbLines); i++ {
+		if lineStartsVerbBlock(dbLines[i]) {
+			return i, nil
+		}
+	}
+	return -1, fmt.Errorf("Error finding verb block start line: reached end of DB")
+}
+
 func main() {
 
 	arg.MustParse(&args)
@@ -271,18 +282,26 @@ func main() {
 	lines := strings.Split(string(b), "\n")
 	//header := parseHeader(lines)
 
-	objStart, err := GetObjectBlockStartLine(lines)
+	objStartIdx, err := GetObjectBlockStartLineIndex(lines)
 	if err != nil {
 		fmt.Errorf("Error getting start of object block: %v", err)
 	}
-	fmt.Printf("Start of object block: line %d", objStart)
+
+	verbStartIdx, err := GetVerbBlockStartLineIndex(lines, objStartIdx)
+	if err != nil {
+		fmt.Errorf("Error getting start of verb block: %v", err)
+	}
+
+	objEndIdx := verbStartIdx - 1
+
+	// TODO Determine format of final four blocks (clocks, queued tasks,
+	// suspended tasks, active connections w/ listeners and parse _those_
+	// puppies
+
+	fmt.Printf("Start of object block: line %d", objStartIdx)
 	time.Sleep(1 * time.Second)
 	objects, err := parseObjectBlock(lines, objStart)
 	spew.Dump(objects)
 	z := lineIsRecycledObject("#4 recycled")
 	spew.Dump(z)
-	// box := tview.NewBox().SetBorder(true).SetTitle("Hello, world!")
-	// if err := tview.NewApplication().SetRoot(box, true).Run(); err != nil {
-	// 	panic(err)
-	// }
 }
