@@ -233,16 +233,21 @@ func parseObjectBlock(dbLines []string, startingIndex int) ([]Object, error) {
 func parseHeader(dbLines []string) *DbHeader {
 	versionString := dbLines[0]
 
+	// Get Object Count
 	totalObjectCount, err := strconv.Atoi(dbLines[1])
 	if err != nil {
 		fmt.Errorf("Error parsing object count in db header: %v", err)
 	}
 
+	// Get Verb Count
 	totalVerbCount, err := strconv.Atoi(dbLines[2])
 	if err != nil {
 		fmt.Errorf("Error parsing verb count in db header: %v", err)
 	}
 
+	// Dummy line - might as well capture it and make sure its 0 - if it ain't,
+	// then we may have a malformed DB or we're overlooking something we don't
+	// know about the db format.
 	dummyLine, err := strconv.Atoi(dbLines[3])
 	if err != nil {
 		fmt.Errorf("Error parsing dummy line in db header: %v", err)
@@ -252,11 +257,13 @@ func parseHeader(dbLines []string) *DbHeader {
 		fmt.Errorf("Error parsing DB header: Dummy line is not 0 - you may have a malformed db.")
 	}
 
+	// Get playercount
 	playerCount, err := strconv.Atoi(dbLines[4])
 	if err != nil {
 		fmt.Errorf("Error parsing player count in db header: %v", err)
 	}
 
+	// Shove it into the struct and gtfo
 	return &DbHeader{
 		VersionString:    versionString,
 		TotalObjectCount: totalObjectCount,
@@ -269,7 +276,7 @@ func parseHeader(dbLines []string) *DbHeader {
 // TODO Check the number of players against the line found here
 // to ensure integrity
 func GetObjectBlockStartLine(dbLines []string) (int, error) {
-	for i := 5; i < len(dbLines); i++ {
+	for i := 4; i < len(dbLines); i++ {
 		if strings.HasPrefix("#", dbLines[i]) {
 			return i, nil
 		}
@@ -290,16 +297,19 @@ func GetVerbBlockSartLine(dbLines []string, objStartIdx int) (int, error) {
 }
 
 func main() {
-
+	// Handle args
 	arg.MustParse(&args)
 
+	// Read in the DB and preprocess
 	b, err := os.ReadFile(args.Filename)
 	if err != nil {
 		fmt.Errorf("Error opening database file: %v", err.Error())
 	}
 
 	lines := strings.Split(string(b), "\n")
-	//header := parseHeader(lines)
+
+	// Get header
+	header := parseHeader(lines)
 
 	objStartIdx, err := GetObjectBlockStartLineIndex(lines)
 	if err != nil {
@@ -314,11 +324,9 @@ func main() {
 	objEndIdx := verbStartIdx - 1
 
 	// TODO Determine format of final four blocks (clocks, queued tasks,
-	// suspended tasks, active connections w/ listeners and parse _those_
-	// puppies
+	// suspended tasks, active connections w/ listeners and get relevant bounds
 
 	fmt.Printf("Start of object block: line %d", objStartIdx)
-	time.Sleep(1 * time.Second)
 	objects, err := parseObjectBlock(lines, objStart)
 	spew.Dump(objects)
 	z := lineIsRecycledObject("#4 recycled")
