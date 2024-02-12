@@ -5,12 +5,11 @@ import (
 	"fmt"
 	"os"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
-	"time"
 
 	arg "github.com/alexflint/go-arg"
+	"github.com/davecgh/go-spew/spew"
 	//	"github.com/rivo/tview"
 )
 
@@ -23,7 +22,7 @@ var regexRecycled = regexp.MustCompile(`^#\d+\srecycled$`)
 var regexStartsObjDef = regexp.MustCompile(`^#\d+$`)
 var regexStartsVerbBlock = regexp.MustCompile(`^#\d+:\d+$`)
 
-var currObjLines []string
+var dbLines []string
 
 type DbHeader struct {
 	VersionString    string
@@ -117,25 +116,32 @@ func lineStartsVerbBlock(line string) bool {
 
 // End of predicate functions!
 
-// DEPRECATED - Function using global state to parse object block
 // Returns the index of the last line of the contents
-// TODO Refactor to avoid global state
-func currentObjectContentsListEndingIndex() int {
-	for i, str := range currObjLines[6:] {
+// TODO Should we refactor this to use a copy of the relevant lines? Not
+// sure what the best practice is in go
+// TODO Return an error instead of a random-ass sentinel value
+func objectContentsListEndingIndex(bounds [2]int, dbLines []string) int {
+
+	// First six lines (0-5) are already parsed
+	scanStartIdx := bounds[0] + 6
+
+	for i, str := range dbLines[scanStartIdx:bounds[1]] {
+		// fmt.Println(str)
+		// fmt.Println(i)
 		if str == "-1" {
-			return i
+			return i + scanStartIdx
 		}
 	}
+	// IT NEVER ENDS AAAAAAAAAAA
 	return -999
 }
 
-// DEPRECATED - Function using global state to parse object block.
 // Returns the index of the end of the child list.
-// TODO Refactor to avoid global state
-func currentObjectChildListEndingIndex(start int) int {
-	for i, str := range currObjLines[start:] {
+// TODO Use errors not sentinel values
+func objectChildListEndingIndex(startIdx int, dbLines []string) int {
+	for i, str := range dbLines[startIdx:] {
 		if str == "-1" {
-			return i
+			return i + startIdx
 		}
 	}
 
@@ -143,32 +149,33 @@ func currentObjectChildListEndingIndex(start int) int {
 	return -999
 }
 
-// DEPRECATED - Function using global state to parse object block
-// TODO Refactor this one to accept object start and end index, for thread safety
-func processCurrentObject() (Object, error) {
-	// Simple enough to parse these
-	fmt.Printf("Object lines: %v\n", len(currObjLines))
+// Process the object at the passed-in bounds
+func processObject(bounds [2]int, dbLines []string) (Object, error) {
+	startIdx := bounds[0]
 
-	num, err := strconv.Atoi(strings.Trim(currObjLines[0], "#"))
-	name := currObjLines[1]
-	handles := currObjLines[2]
-	flags := currObjLines[3]
-	owner, err := strconv.Atoi(currObjLines[4])
-	location, err := strconv.Atoi(currObjLines[5])
+	num, err := strconv.Atoi(strings.Trim(dbLines[startIdx], "#"))
+	name := dbLines[startIdx+1]
+	handles := dbLines[startIdx+2]
+	flags := dbLines[startIdx+3]
+	owner, err := strconv.Atoi(dbLines[startIdx+4])
+	if err != nil {
+		return Object{}, fmt.Errorf("Error parsing current object owner: %v", err)
+	}
+
+	location, err := strconv.Atoi(dbLines[startIdx+5])
 
 	if err != nil {
-		return Object{}, fmt.Errorf("Error parsing current object: %v", err)
+		return Object{}, fmt.Errorf("Error parsing current location: %v", err)
 	}
-	fmt.Println("Ay! Made it!")
-	contentListEndIndex := currentObjectContentsListEndingIndex()
-	runtime.Breakpoint()
+
+	contentListEndIndex := objectContentsListEndingIndex(bounds, dbLines)
 	parentIndex := contentListEndIndex + 1
 	childListStartIndex := parentIndex + 1
-	childListEndIndex := currentObjectChildListEndingIndex(childListStartIndex)
+	childListEndIndex := objectChildListEndingIndex(childListStartIndex, dbLines)
 
-	contentList := currObjLines[6:contentListEndIndex]
-	parent, err := strconv.Atoi(currObjLines[contentListEndIndex])
-	childList := currObjLines[childListStartIndex:childListEndIndex]
+	contentList := dbLines[6:contentListEndIndex]
+	parent, err := strconv.Atoi(dbLines[contentListEndIndex])
+	childList := dbLines[childListStartIndex:childListEndIndex]
 
 	finalObj := Object{
 		Number:      num,
@@ -188,45 +195,6 @@ func processCurrentObject() (Object, error) {
 	// TODO Gtab Property definitions
 
 	// TODO Parse Verb Block
-}
-
-func parseObjectBlock(dbLines []string, startingIndex int) ([]Object, error) {
-	var objects []Object
-
-	for i, value := range dbLines[startingIndex:] {
-		fmt.Printf("Iterating over Line %d: %s\n", i, value)
-
-		if lineIsRecycledObject(value) {
-			fmt.Printf("  It is a recycled object\n")
-			objects = append(objects, ObjectFromRecycledLine(value))
-		} else if lineStartsVerbBlock(value) {
-			fmt.Printf("  It begins the verb block\n")
-			return objects, nil
-		} else if lineStartsObjectDefinition(value) {
-			fmt.Printf("  It starts the object definition\n")
-			fmt.Printf("Tis is it: %v", value)
-			time.Sleep(1 * time.Second)
-			// TODO Think this is fucked - only getting one line before it runs
-			if len(currObjLines) > 0 {
-				fmt.Printf("  An object is waiting to be processed...\n")
-				time.Sleep(1 * time.Second)
-				obj, err := processCurrentObject()
-				if err != nil {
-					return objects, fmt.Errorf("Error processing object: %v", err)
-				}
-				objects = append(objects, obj)
-				currObjLines = []string{}
-			}
-
-			currObjLines = append(currObjLines, value)
-		} else {
-			// Add to current object?
-			currObjLines = append(currObjLines, value)
-		}
-
-	}
-
-	return objects, nil
 }
 
 func parseHeader(dbLines []string) *DbHeader {
@@ -276,13 +244,15 @@ func parseHeader(dbLines []string) *DbHeader {
 // to ensure integrity
 func GetObjectBlockStartLineIndex(dbLines []string) (int, error) {
 	for i := 4; i < len(dbLines); i++ {
-		if strings.HasPrefix("#", dbLines[i]) {
+		fmt.Printf("%d: %s\n", i, dbLines[i])
+		if lineStartsObjectDefinition(dbLines[i]) {
+			fmt.Println("AAAAAAAAAA")
+			fmt.Println(dbLines[i])
 			return i, nil
 		}
 	}
 
 	return 0, errors.New("Unable to find start of object block")
-
 }
 
 // Get the index of the line which starts the verb block
@@ -295,6 +265,8 @@ func GetVerbBlockStartLineIndex(dbLines []string, objStartIdx int) (int, error) 
 	return -1, fmt.Errorf("Error finding verb block start line: reached end of DB")
 }
 
+// Return a slice of slices containing the start and end bounds of all
+// object definitions in the db, starting at specified index
 func getObjDefinitionBounds(dbLines []string, objStartIdx int, objEndIdx int) ([][2]int, error) {
 	doneParsingRecycled := false
 	currentObjStartIdx := -1
@@ -324,6 +296,19 @@ func getObjDefinitionBounds(dbLines []string, objStartIdx int, objEndIdx int) ([
 	return result, nil
 }
 
+func printAround(lines []string, i int) {
+	var indicator string
+
+	for j := i - 4; j < i+5; j++ {
+		if i == j-1 {
+			indicator = "  <-- HERE\n"
+		} else {
+			indicator = "\n"
+		}
+		fmt.Printf("%d: %s %s", j, lines[j], indicator)
+	}
+}
+
 func main() {
 	// Handle args
 	arg.MustParse(&args)
@@ -351,14 +336,25 @@ func main() {
 
 	objEndIdx := verbStartIdx - 1
 
+	// TODO Get
 	// TODO Determine format of final four blocks (clocks, queued tasks,
 	// suspended tasks, active connections w/ listeners and get relevant bounds
 
-	fmt.Printf("Start of object block: line %d", objStartIdx)
+	fmt.Printf("Start of object block: index %d\n", objStartIdx)
+	printAround(lines, objStartIdx-1)
 	oDefBounds, err := getObjDefinitionBounds(lines, objStartIdx, objEndIdx)
-	fmt.Println(oDefBounds)
-	// objects, err := parseObjectBlock(lines, objStart)
-	// spew.Dump(objects)
+
+	fmt.Println(oDefBounds[:3])
+	var objInstances []Object
+	for _, b := range oDefBounds {
+		obj, err := processObject(b, lines)
+		if err != nil {
+			fmt.Errorf("Error processing object: %v", err)
+		}
+		objInstances = append(objInstances, obj)
+	}
+
+	spew.Dump(objInstances[0])
 	// z := lineIsRecycledObject("#4 recycled")
 	// spew.Dump(z)
 }
