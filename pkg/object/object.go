@@ -3,6 +3,7 @@ package object
 import (
 	"fmt"
 	"strconv"
+	"strings"
 )
 
 func NewFromLines(lines []string) *Object {
@@ -20,13 +21,13 @@ func NewFromLines(lines []string) *Object {
 
 // Sets the index of the last line of the contents
 // TODO Return an error instead of a random-ass sentinel value
-func (o *Object) setContentsListEndingIndex() error {
+func (o *Object) setContentsListEndIndex() error {
 	startIdx := 6
 	// First six lines (0-5) are already parsed
 
 	for i, str := range o.Lines[startIdx:] {
 		if str == "-1" {
-			o.contentsListEndIdx = i + startIdx
+			o.contentsListEndIndex = i + startIdx
 		}
 	}
 
@@ -34,12 +35,11 @@ func (o *Object) setContentsListEndingIndex() error {
 }
 
 // Set the index of the end of the child list.
-// TODO Use errors not sentinel values
-func (o *Object) setObjectChildListEndingIndex() error {
-	startIdx := o.contentsListEndIdx + 1
+func (o *Object) setChildListEndIndex() error {
+	startIdx := o.contentsListEndIndex + 1
 	for i, str := range o.Lines[startIdx:] {
 		if str == "-1" {
-			o.childListEndIdx = i + startIdx
+			o.childListEndIndex = i + startIdx
 		}
 	}
 
@@ -48,7 +48,7 @@ func (o *Object) setObjectChildListEndingIndex() error {
 }
 
 func (o *Object) Parse() (*Object, error) {
-	num, err := strconv.Atoi(o.Lines[0], "#")
+	num, err := strconv.Atoi(strings.Trim(o.Lines[0], "#"))
 	name := o.Lines[1]
 	handles := o.Lines[2]
 	flags := o.Lines[3]
@@ -63,14 +63,16 @@ func (o *Object) Parse() (*Object, error) {
 		return &Object{}, fmt.Errorf("Error parsing current location: %v", err)
 	}
 
-	o.setObjectContentsListEndingIndex()
-	parentIndex := contentListEndIndex + 1
-	childListStartIndex := parentIndex + 1
-	childListEndIndex := o.setObjectChildListEndingIndex(childListStartIndex)
+	o.setContentsListEndIndex()
+	o.setChildListEndIndex()
 
-	contentList := o.Lines[6:contentListEndIndex]
-	parent, err := strconv.Atoi(o.Lines[contentListEndIndex])
-	childList := o.Lines[childListStartIndex:childListEndIndex]
+	parentIndex := o.contentsListEndIndex + 1
+	parent, err := strconv.Atoi(o.Lines[parentIndex])
+	childListStartIndex := parentIndex + 1
+
+	contentList := o.Lines[6:o.contentsListEndIndex]
+
+	childList := o.Lines[childListStartIndex:o.childListEndIndex]
 
 	finalObj := Object{
 		Number:      num,
@@ -84,5 +86,5 @@ func (o *Object) Parse() (*Object, error) {
 		ChildList:   childList,
 	}
 
-	return finalObj, nil
+	return &finalObj, nil
 }

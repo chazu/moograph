@@ -28,18 +28,18 @@ type VerbDefinition struct {
 
 // You know, for objects.
 type Object struct {
-	Number             int
-	Recycled           bool
-	Name               string
-	handles            string
-	Flags              string
-	Owner              int
-	Location           int
-	ContentList        []string
-	Parent             int
-	ChildList          []string
-	Lines              []string
-	contentsListEndIdx int
-	childListStartIdx  int
-	childListEndIdx    int
+	Number               int
+	Recycled             bool
+	Name                 string
+	handles              string
+	Flags                string
+	Owner                int
+	Location             int
+	ContentList          []string
+	Parent               int
+	ChildList            []string
+	Lines                []string
+	contentsListEndIndex int
+	childListStartIndex  int
+	childListEndIndex    int
 }
