@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"os"
@@ -69,6 +70,7 @@ type Object struct {
 	ContentList []string
 	Parent      int
 	ChildList   []string
+	Lines       []string
 }
 
 // Takes a string representing a recycled object and parses it into an Object
@@ -94,7 +96,6 @@ func lineIsRecycledObject(line string) bool {
 	if regexRecycled.MatchString(line) {
 		return true
 	}
-
 	return false
 }
 
@@ -102,7 +103,6 @@ func lineStartsObjectDefinition(line string) bool {
 	if regexStartsObjDef.MatchString(line) {
 		return true
 	}
-
 	return false
 }
 
@@ -110,11 +110,8 @@ func lineStartsVerbBlock(line string) bool {
 	if regexStartsVerbBlock.MatchString(line) {
 		return true
 	}
-
 	return false
 }
-
-// End of predicate functions!
 
 // Returns the index of the last line of the contents
 // TODO Should we refactor this to use a copy of the relevant lines? Not
@@ -151,6 +148,7 @@ func objectChildListEndingIndex(startIdx int, dbLines []string) int {
 
 // Process the object at the passed-in bounds
 func processObject(bounds [2]int, dbLines []string) (Object, error) {
+
 	startIdx := bounds[0]
 
 	num, err := strconv.Atoi(strings.Trim(dbLines[startIdx], "#"))
@@ -244,10 +242,10 @@ func parseHeader(dbLines []string) *DbHeader {
 // to ensure integrity
 func GetObjectBlockStartLineIndex(dbLines []string) (int, error) {
 	for i := 4; i < len(dbLines); i++ {
-		fmt.Printf("%d: %s\n", i, dbLines[i])
+		// fmt.Printf("%d: %s\n", i, dbLines[i])
 		if lineStartsObjectDefinition(dbLines[i]) {
-			fmt.Println("AAAAAAAAAA")
-			fmt.Println(dbLines[i])
+			// fmt.Println("AAAAAAAAAA")
+			// fmt.Println(dbLines[i])
 			return i, nil
 		}
 	}
@@ -340,11 +338,11 @@ func main() {
 	// TODO Determine format of final four blocks (clocks, queued tasks,
 	// suspended tasks, active connections w/ listeners and get relevant bounds
 
-	fmt.Printf("Start of object block: index %d\n", objStartIdx)
-	printAround(lines, objStartIdx-1)
+	// fmt.Printf("Start of object block: index %d\n", objStartIdx)
+	// printAround(lines, objStartIdx-1)
 	oDefBounds, err := getObjDefinitionBounds(lines, objStartIdx, objEndIdx)
 
-	fmt.Println(oDefBounds[:3])
+	// fmt.Println(oDefBounds[:3])
 	var objInstances []Object
 	for _, b := range oDefBounds {
 		obj, err := processObject(b, lines)
@@ -353,8 +351,12 @@ func main() {
 		}
 		objInstances = append(objInstances, obj)
 	}
+	fmt.Println(oDefBounds[0][1])
+	for _, thisObj := range objInstances {
+		spew.Dump(thisObj.ContentList)
+		bufio.NewReader(os.Stdin).ReadBytes('\n')
+	}
 
-	spew.Dump(objInstances[0])
 	// z := lineIsRecycledObject("#4 recycled")
 	// spew.Dump(z)
 }
