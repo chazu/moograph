@@ -28,18 +28,20 @@ type VerbDefinition struct {
 
 // You know, for objects.
 type Object struct {
-	Number               int
-	Recycled             bool
-	Name                 string
-	handles              string
-	Flags                string
-	Owner                int
-	Location             int
-	ContentList          []string
-	Parent               int
-	ChildList            []string
-	Lines                []string
+	Number      int
+	Recycled    bool
+	Name        string
+	handles     string
+	Flags       string
+	Owner       int
+	Location    int
+	ContentList []string
+	ParentID    int
+	ChildList   []string
+	Lines       []string
+	// Contents List Starting index is always 6 (or 7?)
 	contentsListEndIndex int
 	childListStartIndex  int
 	childListEndIndex    int
+	parentIndex          int
 }
