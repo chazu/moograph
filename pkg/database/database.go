@@ -1,7 +1,6 @@
 package database
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -45,20 +44,15 @@ func NewDatabase(lines []string) *Database {
 // Return the index of the first line of the object block
 // TODO Check the number of players against the line found here
 // to ensure integrity
-func (d Database) GetObjectBlockStartLineIndex() (int, error) {
-	for i := 4; i < len(d.Lines); i++ {
-		// fmt.Printf("%d: %s\n", i, d.Lines[i])
-		if lineStartsObjectDefinition(d.Lines[i]) {
-			return i, nil
-		}
-	}
+func (d Database) GetObjectBlockStartLineIndex() int {
+	pBounds := d.playerListBounds()
 
-	return 0, errors.New("Unable to find start of object block")
+	return pBounds[1] + 1
 }
 
 // Get the index of the line which starts the verb block
 func (d Database) GetVerbBlockStartLineIndex() (int, error) {
-	for i, _ := d.GetObjectBlockStartLineIndex(); i < len(d.Lines); i++ {
+	for i := d.GetObjectBlockStartLineIndex(); i < len(d.Lines); i++ {
 		if lineStartsVerbBlock(d.Lines[i]) {
 			return i, nil
 		}
@@ -98,14 +92,20 @@ func (d Database) getObjDefinitionBounds(objStartIdx int, objEndIdx int) ([][2]i
 	return result, nil
 }
 
+// Beginning and ending indices of player list.
+// Per https://www.mars.org/home/rob/docs/lmdb.html, the start is always 5
+func (d Database) playerListBounds() [2]int {
+	return [2]int{5, d.Header.TotalPlayerCount + 5}
+}
+
 func (d Database) Parse() error {
 	d.ParseHeader()
 
-	objStartIdx, err := d.GetObjectBlockStartLineIndex()
-	if err != nil {
-		fmt.Errorf("Error getting start of object block: %v", err)
-	}
+	pBounds := d.playerListBounds()
+	// TODO Copy here
+	d.Players = d.Lines[pBounds[0] : pBounds[1]+1]
 
+	objStartIdx := d.GetObjectBlockStartLineIndex()
 	verbStartIdx, err := d.GetVerbBlockStartLineIndex()
 	if err != nil {
 		fmt.Errorf("Error getting start of verb block: %v", err)
@@ -142,7 +142,6 @@ func (d Database) ParseHeader() error {
 	if err != nil {
 		return fmt.Errorf("Error parsing verb count in db header: %v", err)
 	}
-
 	// Dummy line - might as well capture it and make sure its 0 - if it ain't,
 	// then we may have a malformed DB or we're overlooking something we don't
 	// know about the db format.

@@ -13,6 +13,7 @@ type DbHeader struct {
 
 type Database struct {
 	Header  DbHeader
+	Players []string
 	Lines   []string
 	Objects []obj.Object
 }
