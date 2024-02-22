@@ -58,13 +58,12 @@ func (o *Object) setChildListEndIndex() error {
 
 }
 
-func (o *Object) Parse() (*Object, error) {
-	fmt.Println("Parsing Object")
+func (o *Object) Parse() error {
 	num, err := strconv.Atoi(strings.Trim(o.Lines[0], "#"))
 
 	if o.isRecycled() {
 		o.Recycled = true
-		return o, nil
+		return nil
 	}
 
 	name := o.Lines[1]
@@ -72,57 +71,55 @@ func (o *Object) Parse() (*Object, error) {
 	flags := o.Lines[3]
 	owner, err := strconv.Atoi(o.Lines[4])
 	if err != nil {
-		return &Object{}, fmt.Errorf("Error parsing current object owner: %v", err)
+		return fmt.Errorf("Error parsing current object owner: %v", err)
 	}
 
 	location, err := strconv.Atoi(o.Lines[5])
 	if err != nil {
-		return &Object{}, fmt.Errorf("Error parsing current location: %v", err)
+		return fmt.Errorf("Error parsing current location: %v", err)
 	}
-	firstContainedItem, err := strconv.Atoi(oLines[6])
+	firstContainedItem, err := strconv.Atoi(o.Lines[6])
 	if err != nil {
-		return &Object{}, fmt.Errorf("Error parsing first contained item: %v", err)
+		return fmt.Errorf("Error parsing first contained item: %v", err)
 	}
 
 	nextColocatedItem, err := strconv.Atoi(o.Lines[7])
 	if err != nil {
-		return &Object{}, fmt.Errorf("Error parsing next colocated item: %v", err)
+		return fmt.Errorf("Error parsing next colocated item: %v", err)
 	}
 
 	parentID, err := strconv.Atoi(o.Lines[8])
 	if err != nil {
-		return &Object{}, fmt.Errorf("Error parsing parent ID: %v", err)
+		return fmt.Errorf("Error parsing parent ID: %v", err)
 	}
 
 	firstChild, err := strconv.Atoi(o.Lines[9])
 	if err != nil {
-		return &Object{}, fmt.Errorf("Error parsing child ID: %v", err)
+		return fmt.Errorf("Error parsing child ID: %v", err)
 	}
 
 	nextSibling, err := strconv.Atoi(o.Lines[10])
 	if err != nil {
-		return &Object{}, fmt.Errorf("Error parsing next sibling ID: %v", err)
+		return fmt.Errorf("Error parsing next sibling ID: %v", err)
 	}
 
 	verbCount, err := strconv.Atoi(o.Lines[11])
 	if err != nil {
-		return &Object{}, fmt.Errorf("Error parsing verb count for object: %v", err)
+		return fmt.Errorf("Error parsing verb count for object: %v", err)
 	}
 
-	finalObj := Object{
-		Number:             num,
-		Name:               name,
-		handles:            handles,
-		Flags:              flags,
-		Owner:              owner,
-		Location:           location,
-		FirstContainedItem: firstContainedItem,
-		NextColocatedItem:  nextColocatedItem,
-		FirstChild:         firstChild,
-		NextSibling:        nextSibling,
-		VerbCount:          verbCount,
-		ParentID:           parentID,
-	}
+	o.Number = num
+	o.Name = name
+	o.handles = handles
+	o.Flags = flags
+	o.Owner = owner
+	o.Location = location
+	o.FirstContainedItem = firstContainedItem
+	o.NextColocatedItem = nextColocatedItem
+	o.FirstChild = firstChild
+	o.NextSibling = nextSibling
+	o.VerbCount = verbCount
+	o.ParentID = parentID
 
-	return &finalObj, nil
+	return nil
 }

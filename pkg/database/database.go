@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	obj "github.com/chazu/moograph/pkg/object"
+	"github.com/davecgh/go-spew/spew"
 )
 
 // Regexes used in predicate functions below
@@ -122,6 +123,10 @@ func (d Database) Parse() error {
 	for _, b := range oDefBounds {
 		theseLines := d.Lines[b[0]:b[1]]
 		o := obj.NewFromLines(theseLines)
+		if err := o.Parse(); err != nil {
+			return fmt.Errorf("Error parsing object: %v", err)
+		}
+		spew.Dump(o)
 		objInstances = append(objInstances, *o)
 	}
 
